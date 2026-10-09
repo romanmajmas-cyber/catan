@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Остров Поселенцев 3D</title>
+<link rel="stylesheet" href="css/style.css">
+
+<!-- Three.js — синхронно, до ВСЕХ скриптов. Без этого не работает. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p>Загрузка 3D-движка...</p>
+</div>
+
+<div id="fatalError">
+  <h2>⚠️ Ошибка загрузки игры</h2>
+  <p id="fatalErrorMsg"></p>
+  <p><code id="fatalErrorCode"></code></p>
+  <button class="btn" style="max-width:200px;margin-top:20px;" onclick="location.reload()">🔄 Перезагрузить</button>
+</div>
+
+<div id="screen-menu" class="screen active">
+  <div class="panel">
+    <h1>🏝️ Остров Поселенцев</h1>
+    <p class="subtitle">Многопользовательская настольная стратегия</p>
+    <div class="user-badge" id="menuUserBadge" style="display:none;">
+      <div class="avatar" id="menuAvatar">?</div>
+      <div class="info">
+        <div class="name" id="menuUserName">Гость</div>
+        <div class="status">В сети</div>
+      </div>
+    </div>
+    <button class="btn" id="btnCreateRoom" style="display:none;">🎮 Создать комнату</button>
+    <button class="btn secondary" id="btnShowJoin" style="display:none; margin-top:10px;">🔑 Войти в комнату</button>
+    <div id="joinForm" style="display:none; margin-top:14px;">
+      <div class="field"><label>Код комнаты</label><input type="text" id="joinCodeInput" placeholder="XXXX" maxlength="4" style="text-transform:uppercase; text-align:center; font-size:20px; letter-spacing:8px; font-weight:bold;"></div>
+      <div class="btn-row"><button class="btn" id="btnJoinRoom">Войти</button><button class="btn secondary" id="btnCancelJoin">Отмена</button></div>
+    </div>
+    <button class="btn" id="btnShowLogin" style="margin-top:10px;">🔐 Войти в аккаунт</button>
+    <button class="btn secondary" id="btnShowRegister" style="margin-top:8px;">📝 Зарегистрироваться</button>
+    <button class="btn secondary" id="btnSwitchAccount" style="display:none; margin-top:8px;">🔄 Сменить аккаунт</button>
+    <span class="link" id="btnLogout" style="display:none;">Выйти из аккаунта</span>
+  </div>
+</div>
+
+<div id="screen-login" class="screen">
+  <div class="panel">
+    <h2>🔐 Вход в аккаунт</h2>
+    <div class="field"><label>Логин</label><input type="text" id="loginUsername" placeholder="Введите логин" maxlength="20"></div>
+    <div class="field"><label>Пароль</label><input type="password" id="loginPassword" placeholder="Введите пароль"></div>
+    <div class="error-msg" id="loginError"></div>
+    <button class="btn" id="btnDoLogin">Войти</button>
+    <span class="link" id="btnBackFromLogin">← Назад</span>
+  </div>
+</div>
+
+<div id="screen-register" class="screen">
+  <div class="panel">
+    <h2>📝 Регистрация</h2>
+    <div class="field"><label>Логин (3-20 символов)</label><input type="text" id="regUsername" placeholder="Ваш логин" maxlength="20"></div>
+    <div class="field"><label>Пароль (минимум 4 символа)</label><input type="password" id="regPassword" placeholder="Пароль"></div>
+    <div class="field"><label>Повторите пароль</label><input type="password" id="regPassword2" placeholder="Пароль ещё раз"></div>
+    <div class="error-msg" id="registerError"></div>
+    <div class="success-msg" id="registerSuccess"></div>
+    <button class="btn" id="btnDoRegister">Создать аккаунт</button>
+    <span class="link" id="btnBackFromRegister">← Назад</span>
+  </div>
+</div>
+
+<div id="screen-lobby" class="screen">
+  <div class="panel">
+    <h2>🎮 Лобби</h2>
+    <p class="subtitle">Выберите свой цвет, затем создайте комнату или войдите в неё</p>
+    <div class="field"><label>Ваш цвет</label><div class="color-picker" id="lobbyColorPicker"></div></div>
+    <button class="btn" id="btnLobbyCreate">➕ Создать комнату</button>
+    <button class="btn secondary" id="btnLobbyJoin" style="margin-top:10px;">🔑 Войти в комнату</button>
+    <div id="lobbyJoinForm" style="display:none; margin-top:14px;">
+      <div class="field"><label>Код комнаты</label><input type="text" id="lobbyJoinCode" placeholder="XXXX" maxlength="4" style="text-transform:uppercase; text-align:center; font-size:20px; letter-spacing:8px; font-weight:bold;"></div>
+      <div class="btn-row"><button class="btn" id="btnLobbyJoinGo">Войти</button><button class="btn secondary" id="btnLobbyJoinCancel">Отмена</button></div>
+    </div>
+    <span class="link" id="btnBackToMenu">← В главное меню</span>
+  </div>
+</div>
+
+<div id="screen-room" class="screen">
+  <div class="panel" style="min-width:420px;">
+    <h2>🏠 Комната</h2>
+    <div class="room-code-box">
+      <div class="label">Код комнаты</div>
+      <div class="code" id="roomCodeDisplay">----</div>
+      <div class="hint">Поделитесь этим кодом с друзьями</div>
+    </div>
+    <div class="player-list" id="roomPlayerList"></div>
+    <div class="status-tag waiting" id="roomStatus">Ожидание игроков...</div>
+    <button class="btn" id="btnStartGame" style="display:none; margin-top:14px;">🚀 Начать игру</button>
+    <span class="link" id="btnLeaveRoom" style="margin-top:14px;">← Покинуть комнату</span>
+  </div>
+</div>
+
+<div id="gameContainer">
+  <div id="turnOverlay"></div>
+  <div id="ui">
+    <button data-view="iso">🎥 Изометрия</button>
+    <button data-view="top">⬇️ Сверху</button>
+    <button data-view="close">🔍 Приближение</button>
+    <button data-view="decks">🃏 К колодам</button>
+    <button id="btnExitGame" style="background: linear-gradient(180deg, #e74c3c, #a02820); color:#fff;">🚪 Выйти</button>
+  </div>
+  <div id="gamePanel">
+    <h2>🏝️ Поселенцы <span class="vp-badge" id="vpBadge">0 / 10</span></h2>
+    <div id="playersRow"></div>
+    <h3 id="resTitle">📦 Ресурсы</h3>
+    <div class="res-row" id="resRow"></div>
+    <h3>🃏 Карты развития</h3>
+    <div class="dev-row" id="devRow"></div>
+    <h3>🎲 Кубики</h3>
+    <div class="dice-row"><div class="die" id="die1">?</div><div class="die" id="die2">?</div></div>
+    <button id="rollBtn">🎲 Бросить кубики</button>
+    <h3>🔄 Обмен</h3>
+    <div class="action-grid" id="tradeGrid"></div>
+    <h3>🏗️ Постройки</h3>
+    <div class="action-grid" id="buildGrid"></div>
+    <button id="endTurnBtn">⏭️ Передать ход</button>
+    <div id="statusMsg">Расставьте поселение</div>
+    <h3>📜 События</h3>
+    <div id="log"></div>
+  </div>
+  <div id="phaseBadge">ФАЗА: РАССТАНОВКА</div>
+  <div id="victoryModal" class="modal">
+    <h2 style="color:#f0c040;text-align:center;margin:0 0 10px;">🎉 ПОБЕДА!</h2>
+    <p id="victoryText" style="text-align:center;">Игрок набрал 10 очков!</p>
+    <button onclick="document.getElementById('victoryModal').classList.remove('visible')" style="display:block;margin:10px auto;padding:10px 24px;background:linear-gradient(180deg,#f0c040,#d0a020);color:#1a3a5c;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-family:inherit;">Продолжить</button>
+  </div>
+  <div id="tradeModal" class="modal">
+    <h3>🔄 Обмен с банком</h3>
+    <div class="trade-row" id="tradeGiveRow"></div>
+    <div style="text-align:center; font-size:20px; color:#f0c040;">→</div>
+    <div class="trade-row" id="tradeTakeRow"></div>
+    <div class="rate-info" id="tradeRateInfo">Выберите ресурсы</div>
+    <div class="actions"><button class="confirm" id="tradeConfirm">🔄 Обменять</button><button class="cancel" id="tradeCancel">✕ Отмена</button></div>
+  </div>
+  <div id="monopolyModal" class="modal">
+    <h3>💰 Монополия</h3>
+    <div class="rate-info" style="margin-bottom:12px;">Выберите ресурс</div>
+    <div class="trade-row" id="monopolyRow"></div>
+    <div class="actions"><button class="cancel" id="monopolyCancel">✕ Отмена</button></div>
+  </div>
+  <div id="inventionModal" class="modal">
+    <h3>💡 Изобретение</h3>
+    <div class="rate-info" style="margin-bottom:12px;">Выберите 2 любых ресурса</div>
+    <div class="trade-row" id="inventionRow"></div>
+    <div class="rate-info" id="inventionInfo">Выбрано: 0 / 2</div>
+    <div class="actions"><button class="confirm" id="inventionConfirm">✅ Взять</button><button class="cancel" id="inventionCancel">✕ Отмена</button></div>
+  </div>
+  <div id="stealModal" class="modal">
+    <h3>🦹 Кого обокрасть?</h3>
+    <div style="text-align:center;" id="stealVictimsRow"></div>
+    <div class="actions"><button class="cancel" id="stealCancel">✕ Отмена</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ⚠️ ВАЖНО: НЕТ строки loader.js — он больше не нужен -->
+<script src="js/auth.js"></script>
+<script src="js/rooms.js"></script>
+<script src="js/core.js"></script>
+<script src="js/knight_piece.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/pieces.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/hexes/forest.js?v=2"></script>
+<script src="js/hexes/pasture.js?v=2"></script>
+<script src="js/hexes/fields.js?v=100"></script>
+<script src="js/hexes/hills.js?v=2"></script>
+<script src="js/hexes/mountains.js?v=2"></script>
+<script src="js/hexes/desert.js?v=2"></script>
+<script src="js/hexes/_index.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
